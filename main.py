@@ -1,12 +1,22 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from dto import FormData
 import numpy as np
 import pandas as pd
-
 import pickle
 
 app = FastAPI()
 
+# Enable CORS (so your HTML+JS on localhost:3000 can call backend on 8000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # in prod, replace "*" with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Uncomment if you load models
 # with open("stacked_meta_model.pkl", "rb") as f:
 #     stacked_model = pickle.load(f)
 #
@@ -18,6 +28,9 @@ label_mapping = ["False Positive", "Planetary Candidate", "Confirmed Exoplanet"]
 
 @app.post("/predict")
 async def predict(data: FormData):
+    """
+    Accepts JSON data from frontend form and returns processed features
+    """
     features = [
         data.koi_period,
         data.koi_time0bk,
@@ -34,40 +47,33 @@ async def predict(data: FormData):
         data.koi_insol,
         data.koi_dor,
     ]
+    print("excuted")
+
+
+
 
     input_features = np.array([features], dtype=float)
 
-    features_list = input_features.tolist()
-
-    #
-    # prediction_num = stacked_model.predict(input_features)[0]
-    # prediction_label = label_mapping[int(prediction_num)]
-    #
-    #
-    # explanation_values = xai_model.explain(input_features)
-
-    # return {
-    #     "prediction": prediction_label,
-    #     "explanation": explanation_values,
-    #     "note": "This shows the predicted class and feature-level explanation from the X-AI model."
-    # }
-    return {
-        "recived features ":features_list
-    }
+    return {"classification": "test", "confidence_score": 0.95 , "features":features }
 
 
-@app.post("/predict_csv")
-async def predict_csv():
-    # Read the CSV into a pandas DataFrame
-    # df = pd.read_csv(file.file)
-    df = pd.read_csv(r"C:\Users\o1232\OneDrive\Desktop\testing.csv")
 
+@app.post("/predict-csv")
+async def predict_csv(file: UploadFile = File(...)):
+    try:
 
-    features = df.iloc[0, :14].tolist()  # first row, first 15 columns
-
-    input_features = np.array([features], dtype=float)
-
-    # Convert to list for JSON return
-    features_list = input_features.tolist()
-
-    return {"received_features": features_list}
+        df = pd.read_csv(file.file)  # Read uploaded file
+        features = df.iloc[0, :14].tolist()  # SECOND row (index 1), first 14 columns
+        input_features = np.array([features], dtype=float)
+        # For now, return dummy data (replace with actual prediction later)
+        return {
+            "classification": "Planetary Candidate",  # Match what frontend expects
+            "confidence_score": 0.85,                  # Match what frontend expects
+            "received_features": input_features.tolist()  # Optional: for debugging
+        }
+    except Exception as e:
+        return {
+            "classification": "Error",
+            "confidence_score": 0.0,
+            "error": str(e)
+        }
